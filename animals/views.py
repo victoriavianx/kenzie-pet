@@ -1,7 +1,7 @@
 from rest_framework.views import APIView, status, Request, Response
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, get_list_or_404
-from django.http.response import Http404
+from django.http.response import Http404, HttpResponse
 from .serializers import AnimalSerializer
 from .models import Animal
 
@@ -41,10 +41,7 @@ class AnimalDetailView(APIView):
 
         except Http404:
             return Response({"detail": "Animal not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        except ValidationError:
-            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-
+        
         serializer.save()
 
         return Response(serializer.data)
