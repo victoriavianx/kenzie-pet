@@ -1,4 +1,7 @@
-from rest_framework.views import APIView, status, Request, Response, exceptions
+from rest_framework.views import APIView, status, Request, Response
+from rest_framework.exceptions import ValidationError
+from django.shortcuts import get_object_or_404, get_list_or_404
+from django.http.response import Http404
 from .serializers import AnimalSerializer
 from .models import Animal
 
@@ -14,22 +17,45 @@ class AnimalView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def get(self, request: Request) -> Response:
-        animals = Animal.objects.all()
+        animals = get_list_or_404(Animal)
         serializer = AnimalSerializer(animals, many=True)
-
+        
         return Response(serializer.data)
 
 class AnimalDetailView(APIView):
+    def get(self, request: Request, animal_id: int) -> Response:
+        try:
+            animal = get_object_or_404(Animal, id=animal_id)
+            serializer = AnimalSerializer(animal)
+            
+        except Http404:
+            return Response({"detail": "Animal not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(serializer.data)
+
     def patch(self, request: Request, animal_id: int) -> Response:
         try:
-            animal = Animal.objects.get(pk=animal_id)
+            animal = get_object_or_404(Animal, id=animal_id)
             serializer = AnimalSerializer(animal, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
-        except Animal.DoesNotExist:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
-        except exceptions.ValidationError:
+
+        except Http404:
+            return Response({"detail": "Animal not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        except ValidationError:
             return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         serializer.save()
 
         return Response(serializer.data)
+    
+    def delete(self, request: Request, animal_id: int) -> Response:
+        try:
+            animal = get_object_or_404(Animal, id=animal_id)
+
+        except Http404:
+            return Response({"detail": "Animal not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        animal.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

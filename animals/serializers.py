@@ -1,4 +1,6 @@
-from rest_framework import serializers, exceptions
+from math import log as ln
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from groups.serializers import GroupSerializer
 from traits.serializers import TraitSerializer
 from .models import Animal
@@ -11,8 +13,14 @@ class AnimalSerializer(serializers.Serializer):
     age = serializers.IntegerField()
     weight = serializers.FloatField()
     sex = serializers.CharField()
+    age_in_human_years = serializers.SerializerMethodField()
     group = GroupSerializer(many=False)
     traits = TraitSerializer(many=True)
+
+    def get_age_in_human_years(self, obj):
+        human_age = 16 * ln(obj.age) + 31
+
+        return human_age
 
     def create(self, validated_data: dict):
         group_data = validated_data.pop("group")
@@ -32,7 +40,7 @@ class AnimalSerializer(serializers.Serializer):
 
         for key, value in validated_data.items():
             if key == "group" or key == "traits" or key == "sex":
-                raise exceptions.ValidationError({f"{key}": f"You can not update {key} property."})
+                raise ValidationError({f"{key}": f"You can not update {key} property."})
 
             setattr(instance, key, value)
 
