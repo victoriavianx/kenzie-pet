@@ -2,47 +2,64 @@ from django.test import TestCase
 from animals.models import Animal
 from groups.models import Group
 from traits.models import Trait
+from faker import Faker
 
 class AnimalTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.animal_1_data = {
-            "name": "Bidu",
-            "age": 1,
-            "weight": 30.0,
-            "sex": "Macho",
-            "group": {"name": "cão", "scientific_name": "canis familiaris"},
-            "traits": [{"name": "peludo"}, {"name": "médio porte"}]
+        cls.fake = Faker()
+
+        cls.group = Group.objects.create(name="gato", scientific_name="felis catus")
+        cls.trait = Trait.objects.create(name="peludo")
+
+        cls.animal = {
+           "name": cls.fake.first_name(),
+           "age": cls.fake.pyint(1, 15),
+           "weight": cls.fake.pyfloat(min_value=3, max_value=30, right_digits=1),
+           "group": cls.group
         }
 
-        group_1_data = cls.animal_1_data.pop("group")
-        trait_1_data = cls.animal_1_data.pop("traits")
+        cls.animals = [Animal.objects.create(**cls.animal) for _ in range(6)]
 
-        group_animal_1, _ = Group.objects.get_or_create(**group_1_data)
+    def test_animal_cannot_belong_to_more_than_one_group(self):
+        print("Execute test_animal_cannot_belong_to_more_than_one_group")
+
+        group = Group.objects.create(name="cão", scientific_name="canis familiaris")
+
+        for animal in self.animals:
+            animal.group = group
+            animal.save()
         
-        cls.animal_1 = Animal.objects.create(**cls.animal_1_data, group=group_animal_1)
+        for animal in self.animals:
+            self.assertNotIn(animal, self.group.animals.all())
+            self.assertIn(animal, group.animals.all())
 
-        for trait in trait_1_data:
-            traits_animal_1, _ = Trait.objects.get_or_create(**trait)
-            cls.animal_1.traits.add(traits_animal_1)
+    def test_animal_can_be_attached_to_multiple_traits(self):
+        print("Execute test_animal_can_be_attached_to_multiple_traits")
 
+        for animal in self.animals:
+            self.trait.animals.add(animal)
+
+        self.assertEquals(len(self.animals), self.trait.animals.count())
+
+        for animal in self.animals:
+            self.assertIn(self.trait, animal.traits.all())
+        
     def test_animal_fields(self):
         print("Execute test_animal_fields")
+
+        animal = {
+           "name": self.fake.first_name(),
+           "age": self.fake.pyint(1, 15),
+           "sex": "Não informado",
+           "weight": self.fake.pyfloat(min_value=3, max_value=30, right_digits=1),
+           "group": self.group
+        }
+
+        animal_data = Animal.objects.create(**animal)
         
-        self.assertEqual(self.animal_1.name, self.animal_1_data["name"])
-        self.assertEqual(self.animal_1.age, self.animal_1_data["age"])
-        self.assertEqual(self.animal_1.weight, self.animal_1_data["weight"])
-        self.assertEqual(self.animal_1.sex, self.animal_1_data["sex"])
-
-        #Comentando esses dois campos, pois está dando erro já que o animal_1_data não tem os ids como o animal_1 tem
-        # self.assertEqual(self.animal_1.group, self.animal_1_data["group"])
-        # self.assertEqual(self.animal_1.traits, self.animal_1_data["traits"])
-
-    def test_name_max_length(self):
-        print("Execute test_name_max_length")
-
-        expected_max_length = 50
-        result_max_length = self.animal_1._meta.get_field("name").max_length
-        message = "Verifique o max_length do campo 'name'"
-
-        self.assertEqual(result_max_length, expected_max_length, message)
+        self.assertEqual(animal_data.name, animal["name"])
+        self.assertEqual(animal_data.age, animal["age"])
+        self.assertEqual(animal_data.weight, animal["weight"])
+        self.assertEqual(animal_data.sex, animal["sex"])
+        self.assertEqual(animal_data.group, animal["group"])
